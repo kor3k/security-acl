@@ -26,6 +26,8 @@ use Symfony\Component\Security\Acl\Model\AclInterface;
 use Symfony\Component\Security\Acl\Model\AclProviderInterface;
 use Symfony\Component\Security\Acl\Model\ObjectIdentityInterface;
 use Symfony\Component\Security\Acl\Model\PermissionGrantingStrategyInterface;
+use Symfony\Component\Security\Acl\Model\SecurityIdentityInterface;
+use Symfony\Component\Security\Core\Role\Role;
 
 /**
  * An ACL provider implementation.
@@ -37,6 +39,7 @@ use Symfony\Component\Security\Acl\Model\PermissionGrantingStrategyInterface;
 class AclProvider implements AclProviderInterface
 {
     public const MAX_BATCH_SIZE = 30;
+    private const TOKEN_FILTER_PREFIX = 'IS_AUTHENTICATED_';
 
     /**
      * @var AclCacheInterface|null
@@ -219,9 +222,12 @@ class AclProvider implements AclProviderInterface
      *
      * @return string
      */
-    protected function getLookupSql(array $ancestorIds)
+    protected function getLookupSql(array $ancestorIds/*, array $identityIds = []*/)
     {
-        // FIXME: add support for filtering by sids (right now we select all sids)
+        $identityIds = [];
+        if (\func_num_args() > 1) {
+            $identityIds = \func_get_arg(1);
+        }
 
         $sql = <<<SELECTCLAUSE
             SELECT
@@ -255,6 +261,9 @@ class AclProvider implements AclProviderInterface
 SELECTCLAUSE;
 
         $sql .= implode(' OR o.id = ', $ancestorIds).')';
+        if ($identityIds !== []) {
+            $sql .= ' AND (s.identifier = "' . implode('" OR s.identifier = "', $identityIds) . '")';
+        }
 
         return $sql;
     }
@@ -445,6 +454,8 @@ QUERY;
      * This method is called for object identities which could not be retrieved
      * from the cache, and for which thus a database query is required.
      *
+     * @param array<SecurityIdentityInterface> $sids
+     *
      * @return \SplObjectStorage<ObjectIdentityInterface,AclInterface> mapping object identities to ACL instances
      *
      * @throws AclNotFoundException
@@ -456,7 +467,7 @@ QUERY;
             throw new AclNotFoundException('There is no ACL for the given object identity.');
         }
 
-        $sql = $this->getLookupSql($ancestorIds);
+        $sql = $this->getLookupSql($ancestorIds, $this->getIdentityIds($sids));
         $stmt = $this->connection->executeQuery($sql);
 
         return $this->hydrateObjectIdentities($stmt, $oidLookup, $sids);
@@ -668,5 +679,24 @@ QUERY;
         }
 
         return $result;
+    }
+
+
+    /**
+     * Retrieves all the security identity ids which need to be queried from the database
+     *
+     * @param array<SecurityIdentityInterface> $sids
+     *
+     * @return array<string|Role>
+     */
+    private function getIdentityIds(array $sids)
+    {
+        $filteredSids = \array_filter($sids, function ($sid) {
+                    return false === \strpos($sid->getRole(), self::TOKEN_FILTER_PREFIX);
+        });
+
+        return \array_map(function ($sid) {
+               return $sid->getRole();
+        }, $filteredSids);
     }
 }
