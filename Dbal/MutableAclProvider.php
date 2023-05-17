@@ -839,9 +839,7 @@ QUERY;
         $sids = new \SplObjectStorage();
         $classIds = new \SplObjectStorage();
         foreach ($changes[1] as $field => $new) {
-            for ($i = 0, $c = \count($new); $i < $c; ++$i) {
-                $ace = $new[$i];
-
+            foreach ($new as $i => $ace) {
                 if (null === $ace->getId()) {
                     if ($sids->contains($ace->getSecurityIdentity())) {
                         $sid = $sids->offsetGet($ace->getSecurityIdentity());
@@ -879,9 +877,7 @@ QUERY;
     {
         $currentIds = [];
         foreach ($changes[1] as $field => $new) {
-            for ($i = 0, $c = \count($new); $i < $c; ++$i) {
-                $ace = $new[$i];
-
+            foreach($new as $ace) {
                 if (null !== $ace->getId()) {
                     $currentIds[$ace->getId()] = true;
                 }
@@ -889,9 +885,7 @@ QUERY;
         }
 
         foreach ($changes[0] as $old) {
-            for ($i = 0, $c = \count($old); $i < $c; ++$i) {
-                $ace = $old[$i];
-
+            foreach($old as $ace) {
                 if (!isset($currentIds[$ace->getId()])) {
                     $this->connection->executeStatement($this->getDeleteAccessControlEntrySql($ace->getId()));
                     unset($this->loadedAces[$ace->getId()]);
@@ -911,8 +905,7 @@ QUERY;
 
         $sids = new \SplObjectStorage();
         $classIds = new \SplObjectStorage();
-        for ($i = 0, $c = \count($new); $i < $c; ++$i) {
-            $ace = $new[$i];
+        foreach ($new as $i =>  $ace) {
 
             if (null === $ace->getId()) {
                 if ($sids->contains($ace->getSecurityIdentity())) {
@@ -951,17 +944,13 @@ QUERY;
         [$old, $new] = $changes;
         $currentIds = [];
 
-        for ($i = 0, $c = \count($new); $i < $c; ++$i) {
-            $ace = $new[$i];
-
+        foreach ($new as $ace) {
             if (null !== $ace->getId()) {
                 $currentIds[$ace->getId()] = true;
             }
         }
 
-        for ($i = 0, $c = \count($old); $i < $c; ++$i) {
-            $ace = $old[$i];
-
+        foreach($old as $ace) {
             if (!isset($currentIds[$ace->getId()])) {
                 $this->connection->executeStatement($this->getDeleteAccessControlEntrySql($ace->getId()));
                 unset($this->loadedAces[$ace->getId()]);
